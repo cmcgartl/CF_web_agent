@@ -30,6 +30,25 @@ runs.post("/", async (c) => {
 		headers: { "Content-Type": "application/json" },
 	});
 
+	try {
+		await c.env.RUN_QUEUE.send({ runId: run.runId });
+	} catch {
+		const failedRun: ResearchRun = {
+			...run,
+			status: "failed",
+			error: "The run was created but could not be queued for processing.",
+		};
+		await object.fetch("https://research-run/state", {
+			method: "POST",
+			body: JSON.stringify(failedRun),
+			headers: { "Content-Type": "application/json" },
+		});
+		return c.json(
+			{ error: { code: "QUEUE_UNAVAILABLE", message: failedRun.error } },
+			503,
+		);
+	}
+
 	return c.json({ runId: run.runId, status: run.status, createdAt: run.createdAt, statusUrl: `/api/runs/${run.runId}` }, 202);
 });
 
